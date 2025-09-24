@@ -14,8 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const originalCtx = originalCanvas.getContext('2d');
     const drawingCtx = drawingCanvas.getContext('2d');
     
-    // Текущее изображение
+    // Текущее изображение и таймер для debounce
     let currentImage = null;
+    let updateTimeout = null;
     
     // Обработчик загрузки изображения
     imageUpload.addEventListener('change', function(e) {
@@ -37,14 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Рисуем изображение на оригинальном canvas
                     originalCtx.drawImage(img, 0, 0, maxWidth, height);
+                    drawingCtx.drawImage(img, 0, 0, maxWidth, height);
                     
                     currentImage = img;
                     
                     // Показываем секцию предпросмотра
                     previewSection.classList.remove('hidden');
-                    
-                    // Применяем эффект по умолчанию
-                    applyDrawingEffect();
                 };
                 img.src = event.target.result;
             };
@@ -52,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Обработчик перетаскивания файла
+    // Drag and drop
     const uploadSection = document.querySelector('.upload-section');
     uploadSection.addEventListener('dragover', function(e) {
         e.preventDefault();
@@ -69,154 +68,130 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith('image/')) {
-            // Создаем событие изменения для input
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             imageUpload.files = dataTransfer.files;
             
-            // Триггерим событие change
             const event = new Event('change', { bubbles: true });
             imageUpload.dispatchEvent(event);
         }
     });
     
-    // Обработчик изменения интенсивности эффекта
+    // Debounce для ползунка интенсивности
     intensitySlider.addEventListener('input', function() {
         intensityValue.textContent = this.value;
-        if (currentImage) {
-            applyDrawingEffect();
-        }
+        
+        // Очищаем предыдущий таймер
+        clearTimeout(updateTimeout);
+        
+        // Устанавливаем новый таймер (обновление через 300мс после остановки)
+        updateTimeout = setTimeout(() => {
+            if (currentImage) {
+                applyDrawingEffect();
+            }
+        }, 300);
     });
     
-    // Функция применения эффекта рисунка
+    // Улучшенная функция применения эффекта рисунка
     function applyDrawingEffect() {
         if (!currentImage) return;
         
         const intensity = parseInt(intensitySlider.value);
         
-        // Копируем изображение с оригинального canvas на drawing canvas
+        // Копируем оригинал
         drawingCtx.drawImage(originalCanvas, 0, 0);
         
         // Получаем данные изображения
         const imageData = drawingCtx.getImageData(0, 0, drawingCanvas.width, drawingCanvas.height);
         const data = imageData.data;
         
-        // Применяем фильтры для создания эффекта рисунка
-        applySketchFilter(data, intensity);
+        // Применяем улучшенный фильтр
+        applyImprovedSketchFilter(data, drawingCanvas.width, drawingCanvas.height, intensity);
         
-        // Возвращаем обработанные данные на canvas
+        // Возвращаем обработанные данные
         drawingCtx.putImageData(imageData, 0, 0);
     }
     
-    // Функция применения фильтра "рисунок"
-    function applySketchFilter(data, intensity) {
-        // Преобразуем в оттенки серого
-        for (let i = 0; i < data.length; i += 4) {
-            const gray = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
-            data[i] = data[i + 1] = data[i + 2] = gray;
+    // Улучшенный алгоритм преобразования в рисунок
+    function applyImprovedSketchFilter(data, width, height, intensity) {
+        // Создаем временный буфер для серого изображения
+        const grayData = new Uint8ClampedArray(width * height);
+        
+        // Конвертируем в оттенки серого
+        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            grayData[j] = gray;
         }
         
-        // Инвертируем цвета
-        for (let i = 0; i < data.length; i += 4) {
-            data[i] = 255 - data[i];
-            data[i + 1] = 255 - data[i + 1];
-            data[i + 2] = 255 - data[i + 2];
-        }
-        
-        // Применяем размытие (чем выше интенсивность, тем сильнее размытие)
-        applyBlurFilter(data, drawingCanvas.width, drawingCanvas.height, intensity / 10);
-        
-        // Смешиваем с оригиналом (режим осветления)
-        const originalData = originalCtx.getImageData(0, 0, originalCanvas.width, originalCanvas.height).data;
-        
-        for (let i = 0; i < data.length; i += 4) {
-            const r1 = originalData[i] / 255;
-            const r2 = data[i] / 255;
-            
-            let result = 0;
-            if (r2 < 1) {
-                result = Math.min(1, r1 / (1 - r2)) * 255;
-            } else {
-                result = 255;
-            }
-            
-            data[i] = data[i + 1] = data[i + 2] = result;
-        }
-    }
-    
-    // Функция применения размытия по Гауссу
-    function applyBlurFilter(data, width, height, radius) {
-        const pixels = data;
-        const tempPixels = new Uint8ClampedArray(pixels.length);
-        
-        // Горизонтальное размытие
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                let r = 0, g = 0, b = 0, a = 0;
-                let count = 0;
+        // Применяем детектор краев (оператор Собеля)
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                const idx = (y * width + x) * 4;
                 
-                for (let kx = -radius; kx <= radius; kx++) {
-                    const px = Math.min(width - 1, Math.max(0, x + kx));
-                    const index = (y * width + px) * 4;
-                    
-                    r += pixels[index];
-                    g += pixels[index + 1];
-                    b += pixels[index + 2];
-                    a += pixels[index + 3];
-                    count++;
-                }
+                // Вычисляем градиенты по X и Y
+                const gx = (
+                    -grayData[(y-1)*width + (x-1)] + grayData[(y-1)*width + (x+1)] +
+                    -2 * grayData[y*width + (x-1)] + 2 * grayData[y*width + (x+1)] +
+                    -grayData[(y+1)*width + (x-1)] + grayData[(y+1)*width + (x+1)]
+                );
                 
-                const index = (y * width + x) * 4;
-                tempPixels[index] = r / count;
-                tempPixels[index + 1] = g / count;
-                tempPixels[index + 2] = b / count;
-                tempPixels[index + 3] = a / count;
+                const gy = (
+                    -grayData[(y-1)*width + (x-1)] - 2 * grayData[(y-1)*width + x] - grayData[(y-1)*width + (x+1)] +
+                    grayData[(y+1)*width + (x-1)] + 2 * grayData[(y+1)*width + x] + grayData[(y+1)*width + (x+1)]
+                );
+                
+                // Вычисляем величину градиента
+                const gradient = Math.sqrt(gx * gx + gy * gy);
+                
+                // Нормализуем и инвертируем для эффекта рисунка
+                let sketchValue = Math.min(255, gradient * (intensity * 0.5));
+                sketchValue = 255 - sketchValue;
+                
+                // Устанавливаем результат для всех каналов
+                data[idx] = sketchValue;     // R
+                data[idx + 1] = sketchValue; // G
+                data[idx + 2] = sketchValue; // B
+                // Alpha остается без изменений
             }
         }
         
-        // Вертикальное размытие
+        // Обрабатываем границы (заполняем белым)
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                let r = 0, g = 0, b = 0, a = 0;
-                let count = 0;
-                
-                for (let ky = -radius; ky <= radius; ky++) {
-                    const py = Math.min(height - 1, Math.max(0, y + ky));
-                    const index = (py * width + x) * 4;
-                    
-                    r += tempPixels[index];
-                    g += tempPixels[index + 1];
-                    b += tempPixels[index + 2];
-                    a += tempPixels[index + 3];
-                    count++;
+                if (y === 0 || y === height-1 || x === 0 || x === width-1) {
+                    const idx = (y * width + x) * 4;
+                    data[idx] = data[idx + 1] = data[idx + 2] = 255;
                 }
-                
-                const index = (y * width + x) * 4;
-                pixels[index] = r / count;
-                pixels[index + 1] = g / count;
-                pixels[index + 2] = b / count;
-                pixels[index + 3] = a / count;
             }
         }
     }
     
-    // Обработчик кнопки применения эффекта
+    // Обработчики кнопок
     applyEffectBtn.addEventListener('click', applyDrawingEffect);
     
-    // Обработчик кнопки сброса
     resetBtn.addEventListener('click', function() {
         if (currentImage) {
             drawingCtx.drawImage(originalCanvas, 0, 0);
         }
     });
     
-    // Обработчик кнопки сохранения
     downloadBtn.addEventListener('click', function() {
         if (!currentImage) return;
         
         const link = document.createElement('a');
-        link.download = 'рисунок.png';
+        link.download = 'рисунок-' + Date.now() + '.png';
         link.href = drawingCanvas.toDataURL('image/png');
         link.click();
+    });
+    
+    // Предотвращаем перетаскивание файлов на всю страницу
+    document.addEventListener('dragover', function(e) {
+        if (e.target === uploadSection) return;
+        e.preventDefault();
+    });
+    
+    document.addEventListener('drop', function(e) {
+        if (e.target === uploadSection) return;
+        e.preventDefault();
     });
 });
