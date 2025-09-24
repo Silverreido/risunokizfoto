@@ -28,6 +28,12 @@ header {
 header h1 {
     color: #4a76a8;
     margin-bottom: 10px;
+    font-size: 2.2rem;
+}
+
+header p {
+    color: #666;
+    font-size: 1.1rem;
 }
 
 .upload-section {
@@ -37,6 +43,13 @@ header h1 {
     text-align: center;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     margin-bottom: 30px;
+    transition: all 0.3s ease;
+    border: 2px dashed transparent;
+}
+
+.upload-section.dragover {
+    background: #f0f8ff !important;
+    border: 2px dashed #4a76a8 !important;
 }
 
 .upload-btn {
@@ -48,10 +61,13 @@ header h1 {
     cursor: pointer;
     transition: background 0.3s;
     margin-bottom: 15px;
+    font-weight: 500;
 }
 
 .upload-btn:hover {
     background: #3a6698;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .upload-btn input {
@@ -78,6 +94,7 @@ header h1 {
     position: relative;
     width: 100%;
     margin-bottom: 20px;
+    transition: opacity 0.3s ease;
 }
 
 #original-canvas, #drawing-canvas {
@@ -87,6 +104,7 @@ header h1 {
     margin: 0 auto;
     border: 1px solid #ddd;
     border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 #original-canvas {
@@ -99,17 +117,74 @@ header h1 {
 
 .slider-control {
     margin-bottom: 20px;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
 }
 
 .slider-control label {
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
+    color: #333;
 }
 
-.slider-control input {
+.slider-control input[type="range"] {
     width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #ddd;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
     margin-bottom: 5px;
+}
+
+.slider-control input[type="range"]:hover {
+    opacity: 1;
+}
+
+.slider-control input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4a76a8;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.slider-control input[type="range"]::-webkit-slider-thumb:hover {
+    background: #3a6698;
+    transform: scale(1.1);
+}
+
+.slider-control input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4a76a8;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.slider-control input[type="range"]::-moz-range-thumb:hover {
+    background: #3a6698;
+    transform: scale(1.1);
+}
+
+#intensity-value {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    font-weight: bold;
+    color: #4a76a8;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid #4a76a8;
 }
 
 .button-group {
@@ -120,12 +195,13 @@ header h1 {
 }
 
 .btn {
-    padding: 10px 20px;
+    padding: 12px 24px;
     border: none;
     border-radius: 5px;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.3s;
+    font-weight: 500;
 }
 
 .btn.primary {
@@ -135,6 +211,8 @@ header h1 {
 
 .btn.primary:hover {
     background: #3a6698;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .btn.secondary {
@@ -144,6 +222,8 @@ header h1 {
 
 .btn.secondary:hover {
     background: #d5dbe1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .btn.success {
@@ -153,6 +233,30 @@ header h1 {
 
 .btn.success:hover {
     background: #3d8b40;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.loading {
+    opacity: 0.7;
+    pointer-events: none;
+    position: relative;
+}
+
+.loading::after {
+    content: 'Обработка...';
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+    color: #4a76a8;
+    font-weight: 500;
 }
 
 footer {
@@ -168,6 +272,18 @@ footer {
         padding: 10px;
     }
     
+    header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .upload-section {
+        padding: 30px 15px;
+    }
+    
+    .slider-control {
+        padding: 10px;
+    }
+    
     .button-group {
         flex-direction: column;
     }
@@ -175,4 +291,28 @@ footer {
     .btn {
         width: 100%;
     }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.preview-section {
+    animation: fadeIn 0.5s ease;
+}
+
+/* Стили для состояния обработки */
+.processing .image-container {
+    opacity: 0.7;
+}
+
+.processing::after {
+    content: 'Идет обработка изображения...';
+    display: block;
+    text-align: center;
+    color: #4a76a8;
+    font-weight: 500;
+    margin-top: 10px;
 }
